@@ -293,3 +293,163 @@ class StockApplication:
 if __name__ == "__main__":
     app = StockApplication()
     app.run()
+
+    # project 3
+    def download_stock_data(ticker, period="5d", interval="5m"):
+        df = yf.download(tickers=ticker, period=period, interval=interval)
+        if df.empty:
+            raise ValueError(
+                f"No data found for ticker '{ticker}'. The symbol might be invalid or no data is available."
+            )
+        print("\n--- Data Successfully Downloaded ---")
+        print(f"Dataset Shape (Rows, Columns): {df.shape}")
+        print("\nFirst 5 Rows:")
+        print(df.head())
+        return df
+    def clean_data(df):
+        df= df.copy()
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns= df.columns.get_level_values(0)
+        df = df.reset_index()
+        df= df.drop_duplicates()
+        df = df.ffill().dropna()
+        return df
+    def add_technical_columns(df):
+        df= df.copy()
+        df['Price_Change']= df['Close'].diff()
+        df['Percentage_Change']= df['Close'].pct_change() * 100
+        df['Candle_Range']= df['High']- df['Low']
+        df['SMA_10']= df['Close'].rolling(window=10).mean()
+        df['SMA_20']= df['Close'].rolling(window=20).mean()
+        df['Volume_Average']= df['Volume'].rolling(window=10).mean()
+        df['Volatility']= df['Percentage_Change'].rolling(window=20).std()
+        return df
+    def generate_signals(df):
+        df = df.copy()
+        conditions= [
+            df['SMA_10']>df['SMA_20'],
+            df['SMA_10']<df['SMA_20'],
+        ]
+        choices= ["BUY", "SELL"]
+        df["Signal"]= np.select(conditions, choices, default= "Hold")
+        return df
+    def analyze_data(df):
+        print("\n--- Market Data Summary ---")
+        print(f"Total Candles: {len(df)}")
+        print(f"Average Close Price: {df['Close'].mean():.2f}")
+        print(f"Highest Price: {df['High'].max():.2f}")
+        print(f"Lowest Price: {df['Low'].min():.2f}")
+        total_vol = df['Volume'].sum()
+        avg_vol = df['Volume'].mean()
+        std_dev = df['Close'].std()
+        buy_count = (df["Signal"] == "BUY").sum()
+        sell_count = (df["Signal"] == "SELL").sum()
+        print(f"BUY Signals: {buy_count}")
+        print(f"SELL Signals: {sell_count}")
+        latest_signal = df['Signal'].iloc[-1]
+        print(f"Total Volume         : {total_vol:,.0f}")
+        print(f"Average Volume       : {avg_vol:,.0f}")
+        print(f"Price Std Dev        : {std_dev:.2f}")
+        print(f"BUY Signals          : {buy_count}")
+        print(f"SELL Signals         : {sell_count}")
+        print(f"Latest Signal        : {latest_signal}")
+        print("========================================================\n")
+        df['Date'] = df['Datetime'].dt.date
+        daily_avg_price= df.groupby('Date')['Close'].mean()
+        daily_max_vol = df.groupby('Date')['Volume'].max()
+        daily_summary = df.groupby('Date').agg(
+        Avg_Close=('Close', 'mean'),
+        Max_Volume=('Volume', 'max')
+        )
+        print(daily_summary)
+        print("\n--- Time-Based Daily Summary ---")
+        print(daily_summary)
+        print("--------------------------------\n")
+    def export_data(df, filename="AAPL_5d_5m_analyzed.csv"):
+        df.to_csv(filename, index=False)
+        print(f"\n[Success] Data exported to {filename}")
+    def time_based_analysis(df):
+                df = df.copy()
+                if "Datetime" in df.columns:
+                    df["Date"] = pd.to_datetime(df["Datetime"]).dt.date
+                elif isinstance(df.index, pd.DatetimeIndex):
+                    df["Date"] = df.index.date
+    
+                daily_summary = df.groupby("Date").agg(
+                    Avg_Close=("Close", "mean"), Max_Volume=("Volume", "max")
+                )
+                print("\n--- Time-Based Daily Summary ---")
+                print(daily_summary)
+                print("--------------------------------\n")
+    def main():
+        df= None
+        while True:
+            print("\n=== STOCK DATA ANALYSIS TOOL ===")
+            print("1. Download New Data")
+            print("2. Clean Data")
+            print("3. Add Indicators & Signals")
+            print("4. View Market Analysis")
+            print("5. View Daily Summary")
+            print("6. Export Data to CSV")
+            print("7. Exit")
+
+            choice = input("Select an option (1-7): ")
+            if choice== "1":
+                ticker= input("Enter ticker symbol(e.g., AAPL):")
+                try:
+                    df = download_stock_data(ticker)
+                except Exception as e:
+                    print(f"\n[Error] Could not download data:{e}")
+
+            elif choice== "2":
+                if df is not None:
+                    df= clean_data(df)
+                    print("\n[Success] Data cleaned successfully!")
+                else:
+                    print("\n[Warning] Please download or load data first!")
+
+            elif choice== "3":
+                if df is not None:
+                    df = add_technical_columns(df)
+                    df = generate_signals(df)
+                    print(
+                        "\n[Success] Technical indicators and signals added successfully!"
+                    )
+                else:
+                    print("\n[Warning] Please download or load data first!")
+
+        
+            elif choice == "4":
+                if df is not None:
+                    analyze_data(df)
+                else:
+                    print("\n[Warning] Please download or load data first!")
+
+        
+            elif choice == "5":
+                if df is not None:
+                    time_based_analysis(df)
+                else:
+                    print("\n[Warning] Please download or load data first!")
+
+        
+            elif choice == "6":
+                if df is not None:
+                    filename = "AAPL_5d_5m_analyzed.csv"
+                    df.to_csv(filename, index=False)
+                    print(f"\n[Success] Data exported to '{filename}'!")
+                else:
+                    print("\n[Warning] Please download or load data first!")
+
+        
+            elif choice == "7":
+                print("\nThank you for using the Stock Data Analysis Tool. Goodbye!")
+                break
+            else: 
+                print("\n[Error] Invalid choice! Please enter a number between 1 and 7.")
+        
+
+
+
+if __name__ == "__main__":
+    main()
